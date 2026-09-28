@@ -7,11 +7,11 @@ namespace BoilerControllerApplication
     //TODO: Add xml comments
     public class Program
     {
-        public static void Main()
+        public static async Task Main()
         {
             IBoilerService boilerService = new BoilerService();
             BoilerController boilerController = new BoilerController(boilerService);
-            boilerController.RunMainMenu();
+            await boilerController.RunMainMenu();
         }
     }
 }

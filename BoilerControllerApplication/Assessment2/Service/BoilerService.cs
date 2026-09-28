@@ -1,11 +1,16 @@
-﻿using BoilerControllerApplication.Core.Interfaces;
+﻿using System.Globalization;
+using System.Threading.Tasks;
+using BoilerControllerApplication.Core.Interfaces;
 using BoilerControllerApplication.Enums;
 
 namespace BoilerControllerApplication.Service
 {
     //TODO: Add xml comments
+
     public class BoilerService : IBoilerService
     {
+        public event StatusUpdate? OnStatusUpdate;
+        public event TimerUpdate? OnTimerUpdate;
         public bool IsSwitchStatusClosed(SwitchStatusMenu switchStatus)
         {
             return SwitchStatusMenu.Close == switchStatus;
@@ -24,6 +29,45 @@ namespace BoilerControllerApplication.Service
         public bool IsBoilerStatusLockout(BoilerStatusMenu boilerStatus)
         {
             return BoilerStatusMenu.Lockout == boilerStatus;
+        }
+
+        public bool IsBoilerStatusOperational(BoilerStatusMenu boilerStatus)
+        {
+            return BoilerStatusMenu.Operational == boilerStatus;
+        }
+
+        public BoilerStatusMenu SetBoilerStatus(BoilerStatusMenu updateToBoilerStatus)
+        { 
+            return updateToBoilerStatus;
+        }
+
+        public async Task RunPrePurgeProcess(BoilerStatusMenu boilerStatus)
+        {
+            await this.RunTimer("Pre-Purge Processing");
+            this.OnStatusUpdate?.Invoke($"Pre-Purge completed");
+            //TODO: Log
+        }
+
+        public async Task RunIgnitionProcess(BoilerStatusMenu boilerStatus)
+        {
+            await this.RunTimer("Ignition Processing");
+            this.OnStatusUpdate?.Invoke($"Ignition completed");
+            //TODO: Log
+        }
+
+        public void RunOperationalProcess(BoilerStatusMenu boilerStatus)
+        {
+            this.OnStatusUpdate?.Invoke("Operational");
+            //TODO: Log
+        }
+
+        public async Task RunTimer(string boilerStatus, int totalSeconds = 10)
+        {
+            for (int i  = totalSeconds ; i > 0; i--)
+            {
+                this.OnTimerUpdate?.Invoke($"Status:{boilerStatus} | Remaining Time:{i} sec");
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
         }
     }
 }
