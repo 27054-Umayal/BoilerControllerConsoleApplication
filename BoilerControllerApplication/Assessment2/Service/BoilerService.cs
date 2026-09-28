@@ -1,5 +1,4 @@
-﻿using BoilerControllerApplication.Controller;
-using BoilerControllerApplication.Core.Interfaces;
+﻿using BoilerControllerApplication.Core.Interfaces;
 using BoilerControllerApplication.Core.Models;
 using BoilerControllerApplication.Enums;
 
@@ -14,9 +13,6 @@ namespace BoilerControllerApplication.Service
         public event StatusUpdate? OnStatusUpdate;
         public event TimerUpdate? OnTimerUpdate;
         public event CancelUpdate? OnCancelUpdate;
-
-        public volatile bool isCancelled = false;
-        public bool isInterrupted = false;
 
         private readonly ILogRepo _logRepo;
 
@@ -54,57 +50,69 @@ namespace BoilerControllerApplication.Service
             return updateToBoilerStatus;
         }
 
-        public void SetCancelled()
+        public void SetCancelled(CancellationTokenSource cts)
         {
-            this.isCancelled = true;
             this.OnCancelUpdate?.Invoke("Operation interrupted...");
+            cts.Cancel();
         }
 
-        public async Task<BoilerStatusMenu> RunPrePurgeProcess(BoilerStatusMenu boilerStatus)
+        public async Task<BoilerStatusMenu> RunPrePurgeProcess(BoilerStatusMenu boilerStatus, CancellationToken token)
         {
-            await this.RunTimer("Pre-Purge Processing", isCancelled);
-            this.OnStatusUpdate?.Invoke($"Pre-Purge completed");
-            EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Pre-Purge completed.");
-            this.AppendLogDetail(log);
-            return BoilerStatusMenu.PrePurge;
+            await this.RunTimer("Pre-Purge Processing", token);
+            if(!token.IsCancellationRequested)
+            {
+                this.OnStatusUpdate?.Invoke($"Pre-Purge completed");
+                EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Pre-Purge completed.");
+                this.AppendLogDetail(log);
+                return BoilerStatusMenu.PrePurge;
+            }
+            else
+            {
+                return BoilerStatusMenu.Lockout;
+            }
         }
 
-        public async Task<BoilerStatusMenu> RunIgnitionProcess(BoilerStatusMenu boilerStatus)
+        public async Task<BoilerStatusMenu> RunIgnitionProcess(BoilerStatusMenu boilerStatus, CancellationToken token)
         {
-            await this.RunTimer("Ignition Processing", isCancelled);
-            this.OnStatusUpdate?.Invoke($"Ignition completed");
-            EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Ignition completed.");
-            this.AppendLogDetail(log);
-            return BoilerStatusMenu.Ignition;
+            await this.RunTimer("Ignition Processing", token);
+            if(!token.IsCancellationRequested)
+            {
+                this.OnStatusUpdate?.Invoke($"Ignition completed");
+                EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Ignition completed.");
+                this.AppendLogDetail(log);
+                return BoilerStatusMenu.Ignition;
+            }
+            else
+            {
+                return BoilerStatusMenu.Lockout;
+            }
         }
 
-        public BoilerStatusMenu RunOperationalProcess(BoilerStatusMenu boilerStatus)
+        public BoilerStatusMenu RunOperationalProcess(BoilerStatusMenu boilerStatus, CancellationToken token)
         {
-            this.OnStatusUpdate?.Invoke("Operational");
-            EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Boiler now operational.");
-            this.AppendLogDetail(log);
-            return BoilerStatusMenu.Operational;
+            if (!token.IsCancellationRequested)
+            {
+                this.OnStatusUpdate?.Invoke("Operational");
+                EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Boiler now operational.");
+                this.AppendLogDetail(log);
+                return BoilerStatusMenu.Operational;
+            }
+            else
+            {
+                return BoilerStatusMenu.Lockout;
+            }
         }
 
-        public async Task RunTimer(string boilerStatus, bool isCancelled, int totalSeconds = 10)
+        public async Task RunTimer(string boilerStatus, CancellationToken token, int totalSeconds = 10)
         {
             for (int i  = totalSeconds ; i > 0; i--)
             {
-               if(!isInterrupted)
+               if(!token.IsCancellationRequested)
                {
-                    if (isCancelled)
-                    {
-                        this.OnCancelUpdate?.Invoke("Operation interrupted..");
-                        isInterrupted = true;
-                        break;
-                    }
-
                     this.OnTimerUpdate?.Invoke($"Status:{boilerStatus} | Remaining Time:{i} sec");
                     await Task.Delay(TimeSpan.FromSeconds(1));
                }
             }
-            Console.WriteLine("Setting it to false");
-            isInterrupted = false;
         }
 
         public List<EventLogModel> LoadLogDetail()

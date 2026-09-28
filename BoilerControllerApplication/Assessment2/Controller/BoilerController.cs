@@ -9,6 +9,7 @@ namespace BoilerControllerApplication.Controller
     /// </summary>
     public class BoilerController
     {
+        public static CancellationTokenSource cts = new CancellationTokenSource();
         public SwitchStatusMenu switchStatus = SwitchStatusMenu.Open;
         public BoilerStatusMenu boilerStatus = BoilerStatusMenu.Lockout;
         public bool isInterrupted = false;
@@ -21,6 +22,7 @@ namespace BoilerControllerApplication.Controller
             this._boilerService.OnStatusUpdate += this.DisplayStatusUpdate;
             this._boilerService.OnTimerUpdate += this.DisplayTimerUpdate;
             this._boilerService.OnCancelUpdate += this.DisplayCancelUpdate;
+
         }
 
         /// <summary>
@@ -44,19 +46,20 @@ namespace BoilerControllerApplication.Controller
                     }
 
                     choice = (StartMenu)intInput;
+                    CancellationToken token = cts.Token;
                     switch (choice)
                     {
                         case StartMenu.StartBoilerSequence:
-                            _ = this.RunStartBoilerSequence();
+                            _ = this.RunStartBoilerSequence(token);
                             break;
                         case StartMenu.StopBoilerSequence:
-                            this.RunStopBoilerSequence();
+                            this.RunStopBoilerSequence(token);
                             break;
                         case StartMenu.SimulateBoilerSequence:
-                            this.RunSimulateBoilerError();
+                            this.RunSimulateBoilerError(token);
                             break;
                         case StartMenu.ToggleRunInterLockSwitch:
-                            this.RunToggleInterLockSwitch();
+                            this.RunToggleInterLockSwitch(token);
                             break;
                         case StartMenu.ResetLockout:
                             this.RunResetLockout();
@@ -87,29 +90,14 @@ namespace BoilerControllerApplication.Controller
             
         }
 
-        private async Task RunStartBoilerSequence()
+        private async Task RunStartBoilerSequence(CancellationToken token)
         {
             if(this._boilerService.IsSwitchStatusClosed(switchStatus) && this._boilerService.IsBoilerStatusReady(boilerStatus))
             {
                 ApplicationConsole.DisplayMessage("Starting the boiler process...");
-                if(this.isInterrupted)
-                {
-                    return;
-                }
-
-                boilerStatus = await this._boilerService.RunPrePurgeProcess(boilerStatus);
-                if (this.isInterrupted)
-                {
-                    return;
-                }
-
-                boilerStatus = await this._boilerService.RunIgnitionProcess(boilerStatus);
-                if (this.isInterrupted)
-                {
-                    return;
-                }
-
-                boilerStatus = this._boilerService.RunOperationalProcess(boilerStatus);
+                boilerStatus = await this._boilerService.RunPrePurgeProcess(boilerStatus, token);
+                boilerStatus = await this._boilerService.RunIgnitionProcess(boilerStatus, token);
+                boilerStatus = this._boilerService.RunOperationalProcess(boilerStatus, token);
             }
             else
             {
@@ -119,21 +107,21 @@ namespace BoilerControllerApplication.Controller
             }
         }
 
-        private void RunStopBoilerSequence()
+        private void RunStopBoilerSequence(CancellationToken token)
         {
             this.boilerStatus = this._boilerService.SetBoilerStatus(BoilerStatusMenu.Lockout);
-            this._boilerService.SetCancelled();
+            this._boilerService.SetCancelled(cts);
             ApplicationConsole.DisplayMessage("Boiler Status changed to Lockout.");
             EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Boiler Status changed to Lockout.");
             this._boilerService.AppendLogDetail(log);
         }
 
-        private void RunSimulateBoilerError()
+        private void RunSimulateBoilerError(CancellationToken token)
         {
             if(this._boilerService.IsBoilerStatusOperational(boilerStatus))
             {
                 this.boilerStatus = this._boilerService.SetBoilerStatus(BoilerStatusMenu.Lockout);
-                this._boilerService.SetCancelled();
+                this._boilerService.SetCancelled(cts);
                 ApplicationConsole.DisplayMessage("Boiler Status changed to Lockout.");
                 EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Boiler Status changed to Lockout.");
                 this._boilerService.AppendLogDetail(log);
@@ -166,7 +154,7 @@ namespace BoilerControllerApplication.Controller
             }
         }
 
-        private void RunToggleInterLockSwitch()
+        private void RunToggleInterLockSwitch(CancellationToken token)
         {
             if(this._boilerService.IsSwitchStatusOpen(switchStatus))
             {
@@ -181,7 +169,7 @@ namespace BoilerControllerApplication.Controller
                 if(this._boilerService.IsBoilerStatusReady(boilerStatus) || this._boilerService.IsBoilerStatusLockout(boilerStatus))
                 {
                     this.switchStatus = SwitchStatusMenu.Open;
-                    this._boilerService.SetCancelled();
+                    this._boilerService.SetCancelled(cts);
                     ApplicationConsole.DisplayMessage("Interlock Switch toggled to Open.");
                     EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Interlock Switch toggled to Open.");
                     this._boilerService.AppendLogDetail(log);

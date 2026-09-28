@@ -17,10 +17,10 @@ namespace BoilerControllerApplication.Core.Interfaces
         public event TimerUpdate? OnTimerUpdate;
         public event CancelUpdate? OnCancelUpdate;
         /// <summary>
-        /// Updates the switch status to closed.
+        /// Checks if the switch status is closed.
         /// </summary>
-        /// <param name="switchStatus"></param>
-        /// <returns></returns>
+        /// <param name="switchStatus">The closed status.</param>
+        /// <returns>True if closed; otherwise false.</returns>
         public bool IsSwitchStatusClosed(SwitchStatusMenu switchStatus);
 
         public bool IsSwitchStatusOpen(SwitchStatusMenu switchStatus);
@@ -33,13 +33,15 @@ namespace BoilerControllerApplication.Core.Interfaces
 
         public BoilerStatusMenu SetBoilerStatus(BoilerStatusMenu updateToBoilerStatus);
 
-        public Task<BoilerStatusMenu> RunPrePurgeProcess(BoilerStatusMenu boilerStatus);
+        public Task<BoilerStatusMenu> RunPrePurgeProcess(BoilerStatusMenu boilerStatus, CancellationToken token);
         
-        public Task<BoilerStatusMenu> RunIgnitionProcess(BoilerStatusMenu boilerStatus);
+        public Task<BoilerStatusMenu> RunIgnitionProcess(BoilerStatusMenu boilerStatus, CancellationToken token);
         
-        public BoilerStatusMenu RunOperationalProcess(BoilerStatusMenu boilerStatus);
+        public BoilerStatusMenu RunOperationalProcess(BoilerStatusMenu boilerStatus, CancellationToken token);
 
-        public void SetCancelled();
+        public void SetCancelled(CancellationTokenSource cts);
+
+        public Task RunTimer(string boilerStatus, CancellationToken token, int totalSeconds = 10);
 
         public List<EventLogModel> LoadLogDetail();
         public void AppendLogDetail(EventLogModel log);
