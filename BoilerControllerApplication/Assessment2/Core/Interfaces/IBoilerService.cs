@@ -1,4 +1,5 @@
-﻿using BoilerControllerApplication.Enums;
+﻿using BoilerControllerApplication.Core.Models;
+using BoilerControllerApplication.Enums;
 using BoilerControllerApplication.Service;
 
 namespace BoilerControllerApplication.Core.Interfaces
@@ -22,10 +23,13 @@ namespace BoilerControllerApplication.Core.Interfaces
 
         public BoilerStatusMenu SetBoilerStatus(BoilerStatusMenu updateToBoilerStatus);
 
-        public Task RunPrePurgeProcess(BoilerStatusMenu boilerStatus);
+        public Task<BoilerStatusMenu> RunPrePurgeProcess(BoilerStatusMenu boilerStatus);
         
-        public Task RunIgnitionProcess(BoilerStatusMenu boilerStatus);
+        public Task<BoilerStatusMenu> RunIgnitionProcess(BoilerStatusMenu boilerStatus);
         
-        public void RunOperationalProcess(BoilerStatusMenu boilerStatus);
+        public BoilerStatusMenu RunOperationalProcess(BoilerStatusMenu boilerStatus);
+
+        public List<EventLogModel> LoadLogDetail();
+        public void AppendLogDetail(EventLogModel log);
     }
 }

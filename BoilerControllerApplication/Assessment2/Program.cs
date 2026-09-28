@@ -1,6 +1,8 @@
 ﻿using BoilerControllerApplication.Controller;
 using BoilerControllerApplication.Core.Interfaces;
+using BoilerControllerApplication.Repository;
 using BoilerControllerApplication.Service;
+using BoilerControllerApplication.View;
 
 namespace BoilerControllerApplication
 {
@@ -9,9 +11,19 @@ namespace BoilerControllerApplication
     {
         public static async Task Main()
         {
-            IBoilerService boilerService = new BoilerService();
-            BoilerController boilerController = new BoilerController(boilerService);
-            await boilerController.RunMainMenu();
+            try
+            {
+                ILogRepo logRepo = new LogRepo();
+                IBoilerService boilerService = new BoilerService(logRepo);
+                BoilerController boilerController = new BoilerController(boilerService);
+                await boilerController.RunMainMenu();
+            }
+
+            catch (Exception ex)
+            {
+                ApplicationConsole.DisplayMessage($"Unexpected error occurred: {ex.Message}");
+            }
+            
         }
     }
 }
