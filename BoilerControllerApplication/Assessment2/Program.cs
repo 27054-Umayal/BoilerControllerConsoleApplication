@@ -6,17 +6,22 @@ using BoilerControllerApplication.View;
 
 namespace BoilerControllerApplication
 {
-    //TODO: Add xml comments
+    /// <summary>
+    /// Serves as the entry point for the Boiler Controller Application.
+    /// </summary>
     public class Program
     {
-        public static async Task Main()
+        /// <summary>
+        /// Initializes the application components and starts the boiler system.
+        /// </summary>
+        public static void Main()
         {
             try
             {
                 ILogRepo logRepo = new LogRepo();
                 IBoilerService boilerService = new BoilerService(logRepo);
                 BoilerController boilerController = new BoilerController(boilerService);
-                await boilerController.RunMainMenu();
+                boilerController.RunMainMenu();
             }
 
             catch (Exception ex)

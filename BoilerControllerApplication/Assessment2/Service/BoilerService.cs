@@ -1,19 +1,22 @@
-﻿using System.Globalization;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using BoilerControllerApplication.Core.Models;
+﻿using BoilerControllerApplication.Controller;
 using BoilerControllerApplication.Core.Interfaces;
+using BoilerControllerApplication.Core.Models;
 using BoilerControllerApplication.Enums;
-using BoilerControllerApplication.Repository;
 
 namespace BoilerControllerApplication.Service
 {
-    //TODO: Add xml comments
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
 
     public class BoilerService : IBoilerService
     {
         public event StatusUpdate? OnStatusUpdate;
         public event TimerUpdate? OnTimerUpdate;
+        public event CancelUpdate? OnCancelUpdate;
+
+        public volatile bool isCancelled = false;
+        public bool isInterrupted = false;
 
         private readonly ILogRepo _logRepo;
 
@@ -51,9 +54,15 @@ namespace BoilerControllerApplication.Service
             return updateToBoilerStatus;
         }
 
+        public void SetCancelled()
+        {
+            this.isCancelled = true;
+            this.OnCancelUpdate?.Invoke("Operation interrupted...");
+        }
+
         public async Task<BoilerStatusMenu> RunPrePurgeProcess(BoilerStatusMenu boilerStatus)
         {
-            await this.RunTimer("Pre-Purge Processing");
+            await this.RunTimer("Pre-Purge Processing", isCancelled);
             this.OnStatusUpdate?.Invoke($"Pre-Purge completed");
             EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Pre-Purge completed.");
             this.AppendLogDetail(log);
@@ -62,7 +71,7 @@ namespace BoilerControllerApplication.Service
 
         public async Task<BoilerStatusMenu> RunIgnitionProcess(BoilerStatusMenu boilerStatus)
         {
-            await this.RunTimer("Ignition Processing");
+            await this.RunTimer("Ignition Processing", isCancelled);
             this.OnStatusUpdate?.Invoke($"Ignition completed");
             EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Ignition completed.");
             this.AppendLogDetail(log);
@@ -77,13 +86,25 @@ namespace BoilerControllerApplication.Service
             return BoilerStatusMenu.Operational;
         }
 
-        public async Task RunTimer(string boilerStatus, int totalSeconds = 10)
+        public async Task RunTimer(string boilerStatus, bool isCancelled, int totalSeconds = 10)
         {
             for (int i  = totalSeconds ; i > 0; i--)
             {
-                this.OnTimerUpdate?.Invoke($"Status:{boilerStatus} | Remaining Time:{i} sec");
-                await Task.Delay(TimeSpan.FromSeconds(1));
+               if(!isInterrupted)
+               {
+                    if (isCancelled)
+                    {
+                        this.OnCancelUpdate?.Invoke("Operation interrupted..");
+                        isInterrupted = true;
+                        break;
+                    }
+
+                    this.OnTimerUpdate?.Invoke($"Status:{boilerStatus} | Remaining Time:{i} sec");
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+               }
             }
+            Console.WriteLine("Setting it to false");
+            isInterrupted = false;
         }
 
         public List<EventLogModel> LoadLogDetail()

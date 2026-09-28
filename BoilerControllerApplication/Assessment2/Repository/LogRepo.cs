@@ -1,12 +1,13 @@
 ﻿using BoilerControllerApplication.Core.Interfaces;
 using BoilerControllerApplication.Core.Models;
 using BoilerControllerApplication.Constants;
-using System.Windows.Markup;
 using System.Globalization;
 
 namespace BoilerControllerApplication.Repository
 {
-    //TODO: Add xml comments
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
     public class LogRepo : ILogRepo
     {
         public LogRepo()

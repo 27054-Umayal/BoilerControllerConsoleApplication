@@ -1,25 +1,32 @@
-﻿using System.Diagnostics;
-using BoilerControllerApplication.Core.Interfaces;
+﻿using BoilerControllerApplication.Core.Interfaces;
 using BoilerControllerApplication.Core.Models;
 using BoilerControllerApplication.Enums;
 using BoilerControllerApplication.View;
 namespace BoilerControllerApplication.Controller
 {
-    //TODO: Add xml comments
+    /// <summary>
+    /// Serves as layer between the view and the service.
+    /// </summary>
     public class BoilerController
     {
         public SwitchStatusMenu switchStatus = SwitchStatusMenu.Open;
         public BoilerStatusMenu boilerStatus = BoilerStatusMenu.Lockout;
-        private readonly IBoilerService _boilerService;
+        public bool isInterrupted = false;
+        private readonly IBoilerService _boilerService; 
+
 
         public BoilerController(IBoilerService boilerService)
         {
             this._boilerService = boilerService;
             this._boilerService.OnStatusUpdate += this.DisplayStatusUpdate;
             this._boilerService.OnTimerUpdate += this.DisplayTimerUpdate;
+            this._boilerService.OnCancelUpdate += this.DisplayCancelUpdate;
         }
 
-        public async Task RunMainMenu()
+        /// <summary>
+        /// Runs the main menu and the corresponding operations based on users choice.
+        /// </summary>
+        public void RunMainMenu()
         {
             try
             {
@@ -40,7 +47,7 @@ namespace BoilerControllerApplication.Controller
                     switch (choice)
                     {
                         case StartMenu.StartBoilerSequence:
-                            await this.RunStartBoilerSequence();
+                            _ = this.RunStartBoilerSequence();
                             break;
                         case StartMenu.StopBoilerSequence:
                             this.RunStopBoilerSequence();
@@ -85,8 +92,23 @@ namespace BoilerControllerApplication.Controller
             if(this._boilerService.IsSwitchStatusClosed(switchStatus) && this._boilerService.IsBoilerStatusReady(boilerStatus))
             {
                 ApplicationConsole.DisplayMessage("Starting the boiler process...");
+                if(this.isInterrupted)
+                {
+                    return;
+                }
+
                 boilerStatus = await this._boilerService.RunPrePurgeProcess(boilerStatus);
+                if (this.isInterrupted)
+                {
+                    return;
+                }
+
                 boilerStatus = await this._boilerService.RunIgnitionProcess(boilerStatus);
+                if (this.isInterrupted)
+                {
+                    return;
+                }
+
                 boilerStatus = this._boilerService.RunOperationalProcess(boilerStatus);
             }
             else
@@ -100,6 +122,7 @@ namespace BoilerControllerApplication.Controller
         private void RunStopBoilerSequence()
         {
             this.boilerStatus = this._boilerService.SetBoilerStatus(BoilerStatusMenu.Lockout);
+            this._boilerService.SetCancelled();
             ApplicationConsole.DisplayMessage("Boiler Status changed to Lockout.");
             EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Boiler Status changed to Lockout.");
             this._boilerService.AppendLogDetail(log);
@@ -110,6 +133,7 @@ namespace BoilerControllerApplication.Controller
             if(this._boilerService.IsBoilerStatusOperational(boilerStatus))
             {
                 this.boilerStatus = this._boilerService.SetBoilerStatus(BoilerStatusMenu.Lockout);
+                this._boilerService.SetCancelled();
                 ApplicationConsole.DisplayMessage("Boiler Status changed to Lockout.");
                 EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Boiler Status changed to Lockout.");
                 this._boilerService.AppendLogDetail(log);
@@ -157,6 +181,7 @@ namespace BoilerControllerApplication.Controller
                 if(this._boilerService.IsBoilerStatusReady(boilerStatus) || this._boilerService.IsBoilerStatusLockout(boilerStatus))
                 {
                     this.switchStatus = SwitchStatusMenu.Open;
+                    this._boilerService.SetCancelled();
                     ApplicationConsole.DisplayMessage("Interlock Switch toggled to Open.");
                     EventLogModel log = new EventLogModel(DateTime.Now, "Operation Status Updated", "Interlock Switch toggled to Open.");
                     this._boilerService.AppendLogDetail(log);
@@ -198,6 +223,12 @@ namespace BoilerControllerApplication.Controller
         private void DisplayTimerUpdate(string message)
         {
             ApplicationConsole.DisplayMessage(message);
+        }
+
+        private void DisplayCancelUpdate(string message)
+        {
+            ApplicationConsole.DisplayMessage(message);
+            this.isInterrupted = true;
         }
 
         private int ReadIntInput(string promptMessage,  out int input)
